@@ -2,7 +2,10 @@
 
 from RPi import GPIO
 import time
-
+import iothub_client
+from iothub_client import IoTHubClient, IoTHubClientError, IoTHubTransportProvider, IoTHubClientResult
+from iothub_client import IoTHubMessage, IoTHubMessageDispositionResult, IoTHubError, DeviceMethodReturnValue
+from datetime import datetime
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -10,6 +13,19 @@ GPIO.setmode(GPIO.BCM)
 LED_ID = {'red':1, 'blue':2, 'green':4}
 LED_PIN = [23,24,25]
 PHOTO_PIN = 18
+
+# The device connection string to authenticate the device with your IoT hub.
+# Using the Azure CLI:
+# az iot hub device-identity show-connection-string --hub-name {YourIoTHubName} --device-id MyNodeDevice --output table
+BASE_CONNECTION_STRING = "HostName={0};DeviceId={1};SharedAccessKey={2}"
+
+# Using the MQTT protocol.
+PROTOCOL = IoTHubTransportProvider.MQTT
+MESSAGE_TIMEOUT = 10000
+
+# Define the JSON message to send to IoT Hub.
+MSG_TXT = '{"sensor_value" : {0}, "time_stamp" : {1}}' 
+INTERVAL = 1
 
 
 def init_leds():
@@ -35,26 +51,92 @@ def rc_time():
     return reading
 
 
+def send_confirmation_callback(message, result, user_context):
+    print ( "IoT Hub responded to message with status: %s" % (result) )
+
+
+def iothub_client_init(conn):
+    # Create an IoT Hub client
+    client = IoTHubClient(conn, PROTOCOL)
+    return client
+
+
+def device_method_callback(method_name, payload, user_context):
+    # Handle direct method calls from IoT Hub    
+    global INTERVAL
+    print ( "\nMethod callback called with:\nmethodName = %s\npayload = %s" % (method_name, payload) )
+    device_method_return_value = DeviceMethodReturnValue()
+    if method_name == "SetTelemetryInterval":
+        try:
+            INTERVAL = int(payload)
+            # Build and send the acknowledgment.
+            device_method_return_value.response = "{ \"Response\": \"Executed direct method %s\" }" % method_name
+            device_method_return_value.status = 200
+        except ValueError:
+            # Build and send an error response.
+            device_method_return_value.response = "{ \"Response\": \"Invalid parameter\" }"
+            device_method_return_value.status = 400
+    else:
+        # Build and send an error response.
+        device_method_return_value.response = "{ \"Response\": \"Direct method not defined: %s\" }" % method_name
+        device_method_return_value.status = 404
+    
+    return device_method_return_value
+
+
 if __name__ == '__main__':
-    init_leds()
+    try:
+        with open('./config.json', 'r') as config_file:
+            config = json.load(config_file)
 
-    while True:
-	reading = rc_time()
+        conn = BASE_CONNECTION_STRING.format(config['HostName'], config['DeviceId'], config['SharedAccessKey'])
+        client = iothub_client_init(conn)
 
-	if reading < 300:
-	    set_leds(LED_ID['green'])
+        # Set up the callback method for direct method calls from the hub.
+        client.set_device_method_callback(
+            device_method_callback, None)    
+    
+        #initialize device indicators
+        init_leds()
 
-	elif reading < 900:
-	    set_leds(LED_ID['blue'])
+        #iitialize tick_count (used for throttling)
+        last_tick = datetime.now()
 
-	else:
-	    set_leds(LED_ID['red'])
+        while True:
+            sensor_value = rc_time()
+            tick_now = datetime.now()
 
-	#print RCtime(18)
+            if reading < 300:
+                sensor_state = LED_ID['green']
 
-	#bar = raw_input("Enter r|b|g|x|0:")
+            elif reading < 900:
+                sensor_state = LED_ID['blue']
 
-	#blah = {'r' : 1, 'b' : 2, 'g' : 4, 'x' : 7, '0' : 0}
+            else:
+                sensor_state = LED_ID['red']
 
-	#foo(blah[bar])
+            # Build the message with telemetry values.
+            message = IoTHubMessage(MSG_TXT.format(sensor_value, str(tick_now)))
 
+            # Add a custom application property to the message.
+            # An IoT hub can filter on these properties without access to the message body.
+            prop_map = message.properties()
+            prop_map.add("sensor_state", sensor_state)
+
+            # set device indicator 
+            set_leds[sensor_state]
+
+            # only send 2x/second since I'm on free tier w/ max 8000 messages/day
+            if (tick_now - tick_last).microsecond > 500000:
+                tick_last = tick_now
+                client.send_event_async(message, send_confirmation_callback, None)
+
+    except IoTHubError as iothub_error:
+        print "Unexpected error %s from IoTHub" % iothub_error
+        return
+
+    except KeyboardInterrupt:
+        print "IoTHubClient sample stopped"
+
+    finally:
+        set_leds(0)
