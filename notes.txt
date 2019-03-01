@@ -1,0 +1,10 @@
+https://docs.microsoft.com/en-us/windows/iot-core/develop-your-app/buildingappsforiotcore
+
+
+https://docs.microsoft.com/en-us/windows/iot-core/learn-about-hardware/pinmappings/pinmappingsrpi
+
+
+
+Failure reason: Windows cannot install package phiot-uwp_1.0.0.0_arm__hak9p2eg7975c because this package depends on a framework that could not be found. Provide the framework "Microsoft.NET.CoreRuntime.1.1" published by "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US", with neutral or ARM processor architecture and minimum version 1.1.26702.0, along with this package to install. The frameworks with name "Microsoft.NET.CoreRuntime.1.1" currently installed are: {} Failure text: Package failed updates, dependency or conflict validation. (0x80073cf3)
+
+
