@@ -7,44 +7,48 @@ import time
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
+LED_ID = {'red':1, 'blue':2, 'green':4}
+LED_PIN = [23,24,25]
+PHOTO_PIN = 18
 
-LEDS = [23,24,25]
 
-map(lambda led: GPIO.setup(led, GPIO.OUT), LEDS)
+def init_leds():
+    map(lambda led: GPIO.setup(led, GPIO.OUT), LED_PIN)
+    set_leds(0)
 
 
-def foo(mask):
-    map(lambda i: GPIO.output(LEDS[i], mask & pow(2,i) == pow(2,i)), range(len(LEDS)))
+def set_leds(mask):
+    map(lambda i: GPIO.output(LED_PIN[i], mask & pow(2,i) == pow(2,i)), range(len(LED_PIN)))
 
-def RCtime(RCpin):
+
+def rc_time():
     reading = 0
-    GPIO.setup(RCpin, GPIO.OUT)
-    GPIO.output(RCpin, GPIO.LOW)
+    GPIO.setup(PHOTO_PIN, GPIO.OUT)
+    GPIO.output(PHOTO_PIN, GPIO.LOW)
     time.sleep(0.1)
 
-    GPIO.setup(RCpin, GPIO.IN)
+    GPIO.setup(PHOTO_PIN, GPIO.IN)
 
-    while (GPIO.input(RCpin) == GPIO.LOW):
+    while (GPIO.input(PHOTO_PIN) == GPIO.LOW):
 	reading += 1
 
     return reading
 
 
-
 if __name__ == '__main__':
-    foo(0)
+    init_leds()
 
     while True:
-	reading = RCtime(18)
+	reading = rc_time()
 
 	if reading < 300:
-	    foo(4) #green (most light)
+	    set_leds(LED_ID['green'])
 
 	elif reading < 900:
-	    foo(2) #blue (medium light)
+	    set_leds(LED_ID['blue'])
 
 	else:
-	    foo(1) #red (low light)
+	    set_leds(LED_ID['red'])
 
 	#print RCtime(18)
 
