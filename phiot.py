@@ -6,6 +6,7 @@ import iothub_client
 from iothub_client import IoTHubClient, IoTHubClientError, IoTHubTransportProvider, IoTHubClientResult
 from iothub_client import IoTHubMessage, IoTHubMessageDispositionResult, IoTHubError, DeviceMethodReturnValue
 from datetime import datetime
+import json
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -24,13 +25,16 @@ PROTOCOL = IoTHubTransportProvider.MQTT
 MESSAGE_TIMEOUT = 10000
 
 # Define the JSON message to send to IoT Hub.
-MSG_TXT = '{"sensor_value" : {0}, "time_stamp" : {1}}' 
+MSG_TXT = '{"sensor_value" : %d, "time_stamp" : %s}'
 INTERVAL = 1
 
 
-def init_leds():
-    map(lambda led: GPIO.setup(led, GPIO.OUT), LED_PIN)
-    set_leds(0)
+map(lambda led: GPIO.setup(led, GPIO.OUT), LED_PIN)
+
+
+#def init_leds():
+#    map(lambda led: GPIO.setup(led, GPIO.OUT), LED_PIN)
+#    set_leds(0)
 
 
 def set_leds(mask):
@@ -80,7 +84,7 @@ def device_method_callback(method_name, payload, user_context):
         # Build and send an error response.
         device_method_return_value.response = "{ \"Response\": \"Direct method not defined: %s\" }" % method_name
         device_method_return_value.status = 404
-    
+
     return device_method_return_value
 
 
@@ -94,10 +98,10 @@ if __name__ == '__main__':
 
         # Set up the callback method for direct method calls from the hub.
         client.set_device_method_callback(
-            device_method_callback, None)    
-    
+            device_method_callback, None)
+
         #initialize device indicators
-        init_leds()
+        set_leds(0)
 
         #iitialize tick_count (used for throttling)
         last_tick = datetime.now()
@@ -106,17 +110,17 @@ if __name__ == '__main__':
             sensor_value = rc_time()
             tick_now = datetime.now()
 
-            if reading < 300:
+            if sensor_value < 300:
                 sensor_state = LED_ID['green']
 
-            elif reading < 900:
+            elif sensor_value < 900:
                 sensor_state = LED_ID['blue']
 
             else:
                 sensor_state = LED_ID['red']
 
             # Build the message with telemetry values.
-            message = IoTHubMessage(MSG_TXT.format(sensor_value, str(tick_now)))
+            message = IoTHubMessage(MSG_TXT % (sensor_value, str(tick_now)))
 
             # Add a custom application property to the message.
             # An IoT hub can filter on these properties without access to the message body.
@@ -133,7 +137,6 @@ if __name__ == '__main__':
 
     except IoTHubError as iothub_error:
         print "Unexpected error %s from IoTHub" % iothub_error
-        return
 
     except KeyboardInterrupt:
         print "IoTHubClient sample stopped"
