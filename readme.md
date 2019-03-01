@@ -1,0 +1,1 @@
+Portions of this code adapted from the following repo: https://github.com/Azure-Samples/azure-iot-samples-python/blob/master/iot-hub/Quickstarts/simulated-device-2/SimulatedDevice.py
