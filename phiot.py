@@ -104,7 +104,7 @@ if __name__ == '__main__':
         set_leds(0)
 
         #iitialize tick_count (used for throttling)
-        last_tick = datetime.now()
+        tick_last = datetime.now()
 
         while True:
             sensor_value = rc_time()
@@ -125,13 +125,13 @@ if __name__ == '__main__':
             # Add a custom application property to the message.
             # An IoT hub can filter on these properties without access to the message body.
             prop_map = message.properties()
-            prop_map.add("sensor_state", sensor_state)
+            prop_map.add("sensor_state", str(sensor_state))
 
             # set device indicator 
-            set_leds[sensor_state]
+            set_leds(sensor_state)
 
             # only send 2x/second since I'm on free tier w/ max 8000 messages/day
-            if (tick_now - tick_last).microsecond > 500000:
+            if (tick_now - tick_last).microseconds > 500000:
                 tick_last = tick_now
                 client.send_event_async(message, send_confirmation_callback, None)
 
